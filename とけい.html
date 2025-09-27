@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>じかんの べんきょう そうごうどけい</title>
+  <style>
+    :root{
+      --bg: #fff5f8; --bg-2:#ffe9f0; --ink:#6b4458;
+      --accent:#ff7aa2; --accent-2:#ffb3c7; --ring:#ffc9d9;
+      --hand-hour:#c65c85;         /* 通常の短針 */
+      --hand-minute:#ff5e8a;       /* 通常の長針 */
+      --hand-hour-active:#a23b6c;  /* ドラッグ中の短針 */
+      --hand-minute-active:#ff2d73;/* ドラッグ中の長針 */
+      --shadow: rgba(107,68,88,.2); --highlight: rgba(255,122,162,.14);
+      --item-h: 56px; --wheel-w: 120px;
+    }
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:ui-rounded,system-ui,-apple-system,"Helvetica Neue","Noto Sans JP",sans-serif;
+      color:var(--ink);
+      background:linear-gradient(180deg,var(--bg),#fff)
+    }
+    .app{
+      max-width:1200px;margin:0 auto;padding:clamp(12px,3vw,24px);
+      display:grid;gap:clamp(12px,2.5vw,24px);grid-template-columns:1fr 1fr;
+    }
+    @media (max-width:980px){.app{grid-template-columns:1fr}}
+    .card{background:#fff;border-radius:16px;box-shadow:0 10px 30px -10px var(--shadow);padding:clamp(12px,2vw,18px)}
+    .title{font-weight:800;font-size:1.1rem;margin:0 0 12px}
+    .full{grid-column:1/-1}
+
+    /* アナログ */
+    .clock-wrap{display:grid;place-items:center;padding:6px}
+    svg{width:min(90vw,520px);max-width:560px;height:auto;touch-action:none}
+    .face{fill:url(#gradFace)}
+    .tick{stroke:var(--ring);stroke-width:2}
+    .tick.major{stroke-width:3}
+    .hand-hour{stroke:var(--hand-hour);stroke-linecap:round;stroke-width:8;transition:stroke .12s ease, stroke-width .12s ease}
+    .hand-minute{stroke:var(--hand-minute);stroke-linecap:round;stroke-width:6;transition:stroke .12s ease, stroke-width .12s ease}
+    .hand-hour.active{stroke:var(--hand-hour-active);stroke-width:10}
+    .hand-minute.active{stroke:var(--hand-minute-active);stroke-width:8}
+    .pin{fill:var(--accent);stroke:#fff;stroke-width:2}
+    .grab{fill:none;stroke:transparent;cursor:grab}
+    .grab.active{cursor:grabbing}
+    #dragHour{stroke-width:46}
+    #dragMinute{stroke-width:36}
+    /* 掴んでいる間だけリングを淡く可視化 */
+    #dragHour.active{stroke:rgba(198,92,133,0.12)}
+    #dragMinute.active{stroke:rgba(255,94,138,0.12)}
+    .num{fill:var(--ink);font-weight:800;font-size:22px;pointer-events:none;user-select:none}
+
+    .hint{font-size:.95rem;color:#7a5a6c}
+
+    /* デジタル */
+    .digital{display:grid;grid-template-rows:auto auto auto 1fr auto auto;gap:12px}
+    .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .toggle{display:inline-flex;align-items:center;gap:10px;background:var(--bg-2);padding:8px 12px;border-radius:999px}
+    .toggle input{accent-color:var(--accent);width:46px;height:24px}
+    .time-input{display:flex;align-items:center;gap:8px;background:var(--bg-2);border-radius:12px;padding:10px 12px}
+    .time-input input{
+      font:800 1.15rem/1.2 ui-rounded,system-ui,-apple-system,"Helvetica Neue";
+      border:none;outline:none;background:transparent;color:var(--ink);width:16ch
+    }
+    .bigtime{font:900 2rem/1 ui-rounded,system-ui,-apple-system;color:var(--accent)}
+    .smalltime{font-weight:800;color:#7a5a6c}
+    .error{color:#b00020;font-size:.95rem}
+
+    /* ボタン */
+    .btn{border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#fff;font-weight:900;box-shadow:0 6px 18px -6px var(--shadow);cursor:pointer}
+    .btn.subtle{background:var(--bg-2);color:#6b4458}
+    .btn:disabled{background:#e9d6dd;color:#9b7186;box-shadow:none;cursor:not-allowed}
+
+    /* スロット（スクロール＆タップ） */
+    .wheels{display:grid;grid-template-columns:var(--wheel-w) var(--wheel-w) auto;gap:10px;align-items:stretch;height:360px;position:relative}
+    .wheel{
+      position:relative;background:#fff;border-radius:14px;
+      box-shadow:inset 0 0 0 1px #f6d9e1, 0 8px 16px -8px var(--shadow);
+      overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+      scroll-snap-type:y mandatory;touch-action:pan-y;scrollbar-width:thin;
+      user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+    }
+    .wheel[hidden]{display:none}
+    .item{
+      height:var(--item-h);display:grid;place-items:center;scroll-snap-align:center;
+      font-weight:800;font-size:1.35rem;color:var(--ink);
+      user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:pointer;
+    }
+    .wheel::before,.wheel::after{content:"";display:block;height:calc((100% - var(--item-h))/2)}
+    .selection-bar{
+      position:absolute;left:0;right:0;top:50%;height:var(--item-h);transform:translateY(-50%);
+      border-radius:10px;box-shadow:inset 0 0 0 2px var(--accent-2), 0 0 0 9999px var(--highlight);pointer-events:none
+    }
+    .wheel-label{text-align:center;font-size:.95rem;margin-top:6px;color:#7a5a6c;font-weight:700}
+    .disabled{pointer-events:none;opacity:.55;filter:grayscale(.05)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- 左：アナログ -->
+    <section class="card clock-wrap" aria-label="あなろぐどけい">
+      <h2 class="title">あなろぐどけい（はりを つかんで うごかしてね）</h2>
+      <svg id="clock" viewBox="0 0 300 300" role="application" aria-roledescription="interactive analog clock">
+        <defs>
+          <radialGradient id="gradFace" cx="50%" cy="45%" r="70%">
+            <stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#ffe8ef"/>
+          </radialGradient>
+        </defs>
+        <!-- 文字盤 -->
+        <circle cx="150" cy="150" r="140" class="face" />
+        <g id="ticks"></g>
+        <g id="numbers"></g>
+        <!-- 針 -->
+        <line id="hourHand" x1="150" y1="150" x2="150" y2="96" class="hand-hour"/>
+        <line id="minuteHand" x1="150" y1="150" x2="150" y2="58" class="hand-minute"/>
+        <circle cx="150" cy="150" r="6" class="pin"/>
+        <!-- 掴むレイヤ（内側＝短針／外側＝長針） -->
+        <circle id="dragHour"   class="grab" cx="150" cy="150" r="86"/>
+        <circle id="dragMinute" class="grab" cx="150" cy="150" r="120"/>
+      </svg>
+      <div class="hint">
+        ・<strong>がいがわ</strong>を つかむ → <strong>ながい はり</strong>（ふん）<br>
+        ・<strong>まんなかに ちかい ところ</strong>を つかむ → <strong>みじかい はり</strong>（じ）
+      </div>
+    </section>
+
+    <!-- 右：デジタル -->
+    <section class="card digital" aria-label="でじたるどけい">
+      <h2 class="title">でじたるどけい（すろっと／＋−／にゅうりょく）</h2>
+
+      <div class="row">
+        <div class="toggle" role="group" aria-label="12じかん/24じかん きりかえ">
+          <label><input type="checkbox" id="mode12"> 12じかん ひょうじ</label>
+        </div>
+        <div class="time-input">
+          <strong>にゅうりょく:</strong>
+          <input id="textTime" autocomplete="off" placeholder="れい 4:20 / ごご 3:45">
+          <span class="hint">Enter で じっこう</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="bigtime" aria-live="polite" id="bigTime">--:--</div>
+        <div class="smalltime" id="analogNow">（あなろぐ：--:--）</div>
+      </div>
+
+      <div class="row" id="errorRow" hidden><div class="error" id="errMsg"></div></div>
+
+      <!-- じっこうボタン（差分があるときだけ有効＆ピンク） -->
+      <div class="row">
+        <button class="btn" id="applyBtn" disabled>じっこう（あなろぐ に てきよう）</button>
+      </div>
+
+      <!-- スロット -->
+      <div class="wheels" aria-label="すろっと ぴっかー" id="wheelsBox">
+        <div class="selection-bar" aria-hidden="true"></div>
+        <div class="wheel" id="wheelHour" role="listbox" aria-label="じ"></div>
+        <div class="wheel" id="wheelMinute" role="listbox" aria-label="ふん"></div>
+        <div class="wheel" id="wheelAmPm" role="listbox" aria-label="ごぜん/ごご" hidden></div>
+      </div>
+      <div class="row">
+        <div class="wheel-label" style="width:var(--wheel-w)">じ</div>
+        <div class="wheel-label" style="width:var(--wheel-w)">ふん</div>
+        <div class="wheel-label" id="ampmLabel">ごぜん / ごご</div>
+      </div>
+
+      <!-- ステッパー -->
+      <div class="row steppers" id="steppers">
+        <div class="step">
+          <div class="lbl">じ</div>
+          <div><button class="btn" id="hUp">＋</button> <button class="btn subtle" id="hDown">−</button></div>
+        </div>
+        <div class="step">
+          <div class="lbl">ふん</div>
+          <div><button class="btn" id="mUp">＋</button> <button class="btn subtle" id="mDown">−</button></div>
+        </div>
+        <div class="step" id="apStep" hidden>
+          <div class="lbl">ごぜん/ごご</div>
+          <div><button class="btn" id="apToggle">きりかえ</button></div>
+        </div>
+      </div>
+
+      <!-- 読み上げ＆音 -->
+      <div class="row">
+        <button class="btn" id="speakBtn">▶︎ よみあげ</button>
+        <label class="toggle"><input type="checkbox" id="autoSpeak"> じどう よみあげ</label>
+        <label class="toggle"><input type="checkbox" id="fxSound" checked> おと を ならす</label>
+        <span class="hint">※ はじめは ぼたんで きょか が ひつよう（おと/こえ）</span>
+      </div>
+    </section>
+
+    <!-- もんだいモード -->
+    <section class="card full" aria-label="もんだい もーど">
+      <h2 class="title">もんだい もーど</h2>
+      <div class="row">
+        <label class="toggle">むずかしさ：
+          <select id="quizLevel">
+            <option value="easy">やさしい（5ふんごと）</option>
+            <option value="normal" selected>ふつう（1ふん）</option>
+          </select>
+        </label>
+        <button class="btn" id="quizStart">しゅつだい</button>
+        <button class="btn" id="quizAnswer" disabled>こたえる</button>
+        <button class="btn subtle" id="quizNext" disabled>つぎの もんだい</button>
+        <label class="toggle"><input type="checkbox" id="quizSpeak"> もんだいを よみあげる</label>
+      </div>
+      <div class="row">
+        <div id="quizPrompt" class="badge">（まだ もんだいは でていません）</div>
+        <div id="quizResult"></div>
+      </div>
+      <div class="row">
+        <div>せいかい：<span id="quizScore">0</span> / <span id="quizTotal">0</span></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ===== util =====
+    const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+    const pad2=n=>String(n).padStart(2,'0');
+    const z2h=(s)=>s.replace(/[０-９：]/g, ch=>{
+      const map={'０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9','：':':'};
+      return map[ch]??ch;
+    });
+
+    // ===== state =====
+    const state={
+      totalMin: 9*60,       // アナログの現在
+      pendingMin: 9*60,     // デジタルの保留
+      is12h:false,
+      itemH: parseInt(getComputedStyle(document.documentElement).getPropertyValue('--item-h')),
+      suppressWheel:false,
+      dragMode:null,
+      prevMinIndex:null,
+      voices:[], voiceJa:null, autoSpeak:false, userInteracted:false,
+      // quiz
+      quizActive:false, quizTarget:null, quizScore:0, quizTotal:0,
+    };
+
+    // ===== elements =====
+    const clock=document.getElementById('clock');
+    const ticksGroup=document.getElementById('ticks');
+    const numbersGroup=document.getElementById('numbers');
+    const hourHand=document.getElementById('hourHand');
+    const minuteHand=document.getElementById('minuteHand');
+    const dragHour=document.getElementById('dragHour');
+    const dragMinute=document.getElementById('dragMinute');
+
+    const mode12=document.getElementById('mode12');
+    const textTime=document.getElementById('textTime');
+    const bigTime=document.getElementById('bigTime');
+    const analogNow=document.getElementById('analogNow');
+    const errorRow=document.getElementById('errorRow');
+    const errMsg=document.getElementById('errMsg');
+
+    const applyBtn=document.getElementById('applyBtn');
+
+    const wheelHour=document.getElementById('wheelHour');
+    const wheelMinute=document.getElementById('wheelMinute');
+    const wheelAmPm=document.getElementById('wheelAmPm');
+    const ampmLabel=document.getElementById('ampmLabel');
+    const wheelsBox=document.getElementById('wheelsBox');
+
+    const hUp=document.getElementById('hUp'), hDown=document.getElementById('hDown');
+    const mUp=document.getElementById('mUp'), mDown=document.getElementById('mDown');
+    const apStep=document.getElementById('apStep'), apToggle=document.getElementById('apToggle');
+
+    const speakBtn=document.getElementById('speakBtn');
+    const autoSpeak=document.getElementById('autoSpeak');
+    const fxSound=document.getElementById('fxSound');
+
+    const quizLevel=document.getElementById('quizLevel');
+    const quizStart=document.getElementById('quizStart');
+    const quizAnswer=document.getElementById('quizAnswer');
+    const quizNext=document.getElementById('quizNext');
+    const quizPrompt=document.getElementById('quizPrompt');
+    const quizResult=document.getElementById('quizResult');
+    const quizScoreSpan=document.getElementById('quizScore');
+    const quizTotalSpan=document.getElementById('quizTotal');
+    const quizSpeak=document.getElementById('quizSpeak');
+
+    // ===== 文字盤の目盛り＆数字 =====
+    (function buildFace(){
+      // 目盛り
+      for(let i=0;i<60;i++){
+        const a=i*6, len=(i%5===0)?12:6, cls=(i%5===0)?'tick major':'tick';
+        const ro=140, ri=ro-len;
+        const x1=150+ri*Math.sin(a*Math.PI/180), y1=150-ri*Math.cos(a*Math.PI/180);
+        const x2=150+ro*Math.sin(a*Math.PI/180), y2=150-ro*Math.cos(a*Math.PI/180);
+        const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+        line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+        line.setAttribute('class',cls); ticksGroup.appendChild(line);
+      }
+      // 数字（1..12）
+      for(let i=1;i<=12;i++){
+        const a=i*30;                // 度
+        const r=112;                 // 半径（数字の位置）
+        const x=150 + r*Math.sin(a*Math.PI/180);
+        const y=150 - r*Math.cos(a*Math.PI/180);
+        const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x',x); t.setAttribute('y',y);
+        t.setAttribute('class','num');
+        t.setAttribute('text-anchor','middle');
+        t.setAttribute('dominant-baseline','middle');
+        t.textContent=String(i);
+        numbersGroup.appendChild(t);
+      }
+    })();
+
+    // ===== フォーマット =====
+    function formatTime(total){
+      const h=Math.floor(total/60), m=total%60;
+      if(state.is12h){
+        const isPM=h>=12; let hh=h%12; if(hh===0) hh=12;
+        return `${isPM?'ごご':'ごぜん'} ${hh}:${pad2(m)}`;
+      }
+      return `${pad2(h)}:${pad2(m)}`;
+    }
+    function formatAnalogNow(){ return `（あなろぐ：${formatTime(state.totalMin)}）`; }
+
+    // ===== ホイール（スロット） =====
+    function makeItem(t){const d=document.createElement('div');d.className='item';d.textContent=t;return d;}
+    function buildWheels(){
+      wheelHour.innerHTML=''; wheelMinute.innerHTML=''; wheelAmPm.innerHTML='';
+      if(state.is12h){ for(let h=1;h<=12;h++) wheelHour.appendChild(makeItem(String(h))); }
+      else{ for(let h=0;h<=23;h++) wheelHour.appendChild(makeItem(pad2(h))); }
+      for(let m=0;m<=59;m++) wheelMinute.appendChild(makeItem(pad2(m)));
+      if(state.is12h){
+        wheelAmPm.appendChild(makeItem('ごぜん')); wheelAmPm.appendChild(makeItem('ごご'));
+        wheelAmPm.hidden=false; ampmLabel.hidden=false; apStep.hidden=false;
+      }else{
+        wheelAmPm.hidden=true; ampmLabel.hidden=true; apStep.hidden=true;
+      }
+      attachWheel(wheelHour); attachWheel(wheelMinute); if(!wheelAmPm.hidden) attachWheel(wheelAmPm);
+      attachTapSelect(wheelHour); attachTapSelect(wheelMinute); attachTapSelect(wheelAmPm);
+      syncWheelsFromPending(true);
+    }
+    function wheelSelectIndex(w,i){
+      state.suppressWheel=true; w.scrollTo({top:i*state.itemH,behavior:'smooth'});
+      setTimeout(()=>state.suppressWheel=false,240);
+    }
+    function readWheelIndex(w){ return Math.round(w.scrollTop/state.itemH); }
+
+    // ★ ホイール値の確定 → pendingMin 更新
+    function commitWheelSelection(explicit = {}) {
+      const mIdx = explicit.m ?? clamp(readWheelIndex(wheelMinute), 0, 59);
+      if (state.is12h) {
+        const hIdx = explicit.h ?? clamp(readWheelIndex(wheelHour), 0, 11); // 0..11→1..12
+        const apIdx = explicit.ap ?? clamp(readWheelIndex(wheelAmPm), 0, 1); // 0:ごぜん/1:ごご
+        const h24  = ((hIdx + 1) % 12) + (apIdx === 1 ? 12 : 0);
+        setPendingMin(h24 * 60 + mIdx);
+      } else {
+        const hIdx = explicit.h ?? clamp(readWheelIndex(wheelHour), 0, 23);
+        setPendingMin(hIdx * 60 + mIdx);
+      }
+    }
+
+    function attachWheel(w){
+      if(!w || w.dataset.bound) return;
+      let t=null;
+
+      w.addEventListener('scroll', ()=>{
+        if(state.suppressWheel) return;
+        if(t) clearTimeout(t);
+        t = setTimeout(()=>{
+          const idx = readWheelIndex(w);
+          wheelSelectIndex(w, idx);
+          const exp = (w===wheelHour) ? {h:idx} : (w===wheelMinute) ? {m:idx} : {ap:idx};
+          setTimeout(()=> commitWheelSelection(exp), 260); // スナップ完了後に反映
+        }, 100);
+      }, {passive:true});
+
+      // 指を離した瞬間にも確定（iPad対策）
+      ['pointerup','touchend','mouseup'].forEach(ev=>{
+        w.addEventListener(ev, ()=>{
+          const idx=readWheelIndex(w);
+          wheelSelectIndex(w, idx);
+          const exp = (w===wheelHour)?{h:idx}:(w===wheelMinute)?{m:idx}:{ap:idx};
+          setTimeout(()=> commitWheelSelection(exp), 260);
+        });
+      });
+
+      // キーボード（デスクトップ）
+      w.setAttribute('tabindex','0');
+      w.addEventListener('keydown', e=>{
+        if(e.key!=='ArrowUp'&&e.key!=='ArrowDown') return;
+        e.preventDefault();
+        const dir=e.key==='ArrowDown'?+1:-1;
+        const idx=readWheelIndex(w)+dir;
+        wheelSelectIndex(w, idx);
+        const exp = (w===wheelHour)?{h:idx}:(w===wheelMinute)?{m:idx}:{ap:idx};
+        setTimeout(()=> commitWheelSelection(exp), 260);
+      });
+
+      w.dataset.bound='1';
+    }
+
+    function attachTapSelect(w){
+      if(!w || w.dataset.tap) return;
+
+      const pick = (e)=>{
+        const item = e.target.closest('.item'); if(!item) return;
+        e.preventDefault?.(); // iPadのコールアウト抑止
+        const items = Array.from(w.querySelectorAll('.item'));
+        const idx = items.indexOf(item);
+        if(idx<0) return;
+        wheelSelectIndex(w, idx);
+        const exp = (w===wheelHour)?{h:idx}:(w===wheelMinute)?{m:idx}:{ap:idx};
+        setTimeout(()=> commitWheelSelection(exp), 260);
+      };
+
+      w.addEventListener('pointerdown', pick, {passive:false}); // タップ即反応
+      w.addEventListener('click', pick);                        // 互換
+      w.dataset.tap='1';
+    }
+
+    function syncWheelsFromPending(){
+      const h=Math.floor(state.pendingMin/60), m=state.pendingMin%60;
+      if(state.is12h){
+        const isPM=h>=12; let hh=h%12; if(hh===0) hh=12;
+        wheelSelectIndex(wheelHour, hh-1);
+        wheelSelectIndex(wheelMinute, m);
+        wheelSelectIndex(wheelAmPm, isPM?1:0);
+      }else{
+        wheelSelectIndex(wheelHour, h);
+        wheelSelectIndex(wheelMinute, m);
+      }
+    }
+
+    // ===== 表示・同期 =====
+    function updateAnalog(){
+      const h=Math.floor(state.totalMin/60), m=state.totalMin%60;
+      minuteHand.setAttribute('transform',`rotate(${m*6} 150 150)`);
+      const hourAngle=((h%12)+m/60)*30;
+      hourHand.setAttribute('transform',`rotate(${hourAngle} 150 150)`);
+      analogNow.textContent = formatAnalogNow();
+    }
+    function updateApplyUI(){
+      const dirty = state.pendingMin !== state.totalMin;
+      applyBtn.disabled = !dirty || state.quizActive;
+    }
+    function updateDigital(){
+      bigTime.textContent = formatTime(state.pendingMin);
+      if(document.activeElement!==textTime){ textTime.value = formatTime(state.pendingMin); }
+      syncWheelsFromPending();
+      updateApplyUI();
+    }
+
+    function setTotalMin(newTotal, origin=null){
+      state.totalMin=((newTotal%1440)+1440)%1440;
+      // アナログ操作・適用時は保留も揃える
+      if(origin && (origin.startsWith('analog') || origin==='apply')){
+        state.pendingMin = state.totalMin;
+      }
+      updateAnalog();
+      updateDigital();
+      if(state.autoSpeak && state.userInteracted){ speakTime(false); }
+    }
+    function setPendingMin(newPending){
+      state.pendingMin=((newPending%1440)+1440)%1440;
+      updateDigital();
+    }
+
+    // ===== 入力 =====
+    function parseTimeInput(str){
+      let s = z2h(str).trim().toLowerCase();
+      s = s.replace(/\s+/g,' ').replace(/：/g,':');
+      s = s.replace(/(分|ふん)$/,'').trim();
+      const hasAM = /(am|ごぜん|午前)/i.test(s);
+      const hasPM = /(pm|ごご|午後)/i.test(s);
+      s = s.replace(/(am|pm|ごぜん|ごご|午前|午後)/ig,'').trim();
+
+      let m = s.match(/^(\d{1,2})\s*:\s*(\d{1,2})$/) || s.match(/^(\d{1,2})\s*(?:時|じ)\s*(\d{1,2})$/);
+      if(!m) return null;
+      let hh=+m[1], mm=+m[2]; if(!(0<=mm && mm<=59)) return null;
+
+      if(state.is12h){
+        if(!(1<=hh && hh<=12)) return null;
+        const h24=(hh%12)+(hasPM?12:0);
+        return h24*60+mm;
+      }else{
+        if(!(0<=hh && hh<=23)) return null;
+        return hh*60+mm;
+      }
+    }
+    function commitTextInput(triggerApply=false){
+      const t=parseTimeInput(textTime.value);
+      if(t==null){ errorRow.hidden=false; errMsg.textContent='じこく の かたち が ちがうよ'; return false; }
+      errorRow.hidden=true; errMsg.textContent='';
+      setPendingMin(t);
+      state.userInteracted=true;
+      if(triggerApply) applyPending();
+      return true;
+    }
+    textTime.addEventListener('keydown', e=>{ if(e.key==='Enter') commitTextInput(true); });
+    textTime.addEventListener('blur', ()=>{ commitTextInput(false); });
+
+    // ===== 12/24 切替 =====
+    mode12.addEventListener('change', ()=>{
+      state.is12h=mode12.checked; buildWheels(); updateDigital();
+    });
+
+    // ===== ステッパー =====
+    hUp.addEventListener('click', ()=>{ setPendingMin(state.pendingMin+60); state.userInteracted=true; });
+    hDown.addEventListener('click', ()=>{ setPendingMin(state.pendingMin-60); state.userInteracted=true; });
+    mUp.addEventListener('click', ()=>{ setPendingMin(state.pendingMin+1); state.userInteracted=true; });
+    mDown.addEventListener('click', ()=>{ setPendingMin(state.pendingMin-1); state.userInteracted=true; });
+    apToggle.addEventListener('click', ()=>{ if(state.is12h){ setPendingMin(state.pendingMin + 12*60); state.userInteracted=true; }});
+
+    // ===== アナログ：ドラッグ =====
+    function pointToAngle(evt){
+      const rect=clock.getBoundingClientRect();
+      const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+      const x=(evt.clientX ?? (evt.touches&&evt.touches[0].clientX)) - cx;
+      const y=(evt.clientY ?? (evt.touches&&evt.touches[0].clientY)) - cy;
+      let deg=Math.atan2(y,x)*180/Math.PI+90; if(deg<0) deg+=360;
+      return {deg};
+    }
+    function minuteDelta(prevIdx, newIdx){
+      let d=newIdx-prevIdx; if(d>30)d-=60; if(d<-30)d+=60; return d;
+    }
+    function startDrag(which){ return function(evt){
+      state.dragMode=which; state.userInteracted=true;
+      if(which==='minute'){
+        const {deg}=pointToAngle(evt); state.prevMinIndex=Math.round(deg/6)%60;
+        minuteHand.classList.add('active'); dragMinute.classList.add('active');
+      }else{
+        hourHand.classList.add('active'); dragHour.classList.add('active');
+      }
+      evt.target.setPointerCapture?.(evt.pointerId ?? 1); evt.preventDefault?.();
+    };}
+    function moveDrag(evt){
+      if(!state.dragMode) return;
+      const {deg}=pointToAngle(evt);
+      if(state.dragMode==='minute'){
+        const idx=Math.round(deg/6)%60;
+        if(state.prevMinIndex==null) state.prevMinIndex=idx;
+        const delta=minuteDelta(state.prevMinIndex, idx);
+        if(delta!==0){ setTotalMin(state.totalMin+delta,'analog-minute'); state.prevMinIndex=(state.prevMinIndex+delta+60)%60; }
+      }else if(state.dragMode==='hour'){
+        const nearestHour = Math.round(deg/30)%12;
+        const cur=(Math.floor(state.totalMin/60))%12;
+        let d=nearestHour-cur; if(d>6)d-=12; if(d<-6)d+=12;
+        if(d!==0) setTotalMin(state.totalMin + d*60, 'analog-hour');
+      }
+      evt.preventDefault?.();
+    }
+    function endDrag(evt){
+      state.dragMode=null; state.prevMinIndex=null;
+      // ハイライト解除
+      minuteHand.classList.remove('active'); dragMinute.classList.remove('active');
+      hourHand.classList.remove('active');   dragHour.classList.remove('active');
+      evt.target.releasePointerCapture?.(evt.pointerId ?? 1); evt.preventDefault?.();
+    }
+    dragMinute.addEventListener('pointerdown', startDrag('minute'), {passive:false});
+    dragMinute.addEventListener('pointermove', moveDrag, {passive:false});
+    dragMinute.addEventListener('pointerup', endDrag, {passive:false});
+    dragMinute.addEventListener('pointercancel', endDrag, {passive:false});
+    dragHour.addEventListener('pointerdown', startDrag('hour'), {passive:false});
+    dragHour.addEventListener('pointermove', moveDrag, {passive:false});
+    dragHour.addEventListener('pointerup', endDrag, {passive:false});
+    dragHour.addEventListener('pointercancel', endDrag, {passive:false});
+
+    // ===== 読み上げ =====
+    function chooseJaVoice(){ state.voices=speechSynthesis.getVoices(); state.voiceJa=state.voices.find(v=> (v.lang||'').toLowerCase().startsWith('ja'))||null; }
+    if('speechSynthesis' in window){ chooseJaVoice(); window.speechSynthesis.onvoiceschanged=chooseJaVoice; }
+    function speak(text){ if(!('speechSynthesis' in window)) return;
+      const u=new SpeechSynthesisUtterance(text); if(state.voiceJa) u.voice=state.voiceJa;
+      u.lang='ja-JP'; u.rate=1.0; u.pitch=1.0; try{ speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){}
+    }
+    function speakTime(explicit=true){
+      const t=state.totalMin;
+      const h=Math.floor(t/60), m=t%60;
+      if(state.is12h){ const isPM=h>=12; let hh=h%12; if(hh===0) hh=12; speak(`${isPM?'ごご':'ごぜん'} ${hh}じ ${m}ふん`); }
+      else{ speak(`${h}じ ${m}ふん`); }
+      if(explicit) state.userInteracted=true;
+    }
+    speakBtn.addEventListener('click', ()=>speakTime(true));
+    autoSpeak.addEventListener('change', ()=>{ state.autoSpeak=autoSpeak.checked; state.userInteracted=true; });
+
+    // ===== 効果音（ピンポーン／ブブー） =====
+    let audioCtx=null;
+    function ensureAudio(){
+      if(!audioCtx){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(AC) audioCtx = new AC();
+      }
+      if(audioCtx && audioCtx.state === 'suspended'){ audioCtx.resume(); }
+    }
+    function tone(freq, start, dur, type='sine', vol=0.22){
+      if(!audioCtx) return;
+      const ctx=audioCtx;
+      const o=ctx.createOscillator();
+      const g=ctx.createGain();
+      o.type=type; o.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + start + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + start);
+      o.stop(ctx.currentTime + start + dur + 0.05);
+    }
+    function playChime(kind){
+      if(!fxSound.checked) return;
+      ensureAudio();
+      if(!audioCtx) return;
+      if(kind==='ok'){
+        tone(880,     0.00, 0.12, 'sine', 0.25);
+        tone(1174.66, 0.14, 0.14, 'sine', 0.22);
+      }else{
+        tone(196, 0.00, 0.25, 'sawtooth', 0.15);
+        tone(185, 0.00, 0.25, 'sawtooth', 0.12);
+        tone(196, 0.28, 0.25, 'sawtooth', 0.15);
+        tone(185, 0.28, 0.25, 'sawtooth', 0.12);
+      }
+    }
+
+    // ===== じっこう =====
+    function applyPending(){
+      if(state.pendingMin===state.totalMin) return;
+      setTotalMin(state.pendingMin,'apply');
+      speakTime(false);
+    }
+    applyBtn.addEventListener('click', applyPending);
+
+    // ===== クイズ =====
+    function setDigitalEnabled(enabled){
+      const on = !!enabled;
+      [wheelsBox, textTime, hUp, hDown, mUp, mDown, apToggle, applyBtn].forEach(el=>{
+        if(!el) return;
+        if(on){ el.classList.remove('disabled'); el.disabled=false; }
+        else{ el.classList.add?.('disabled'); el.disabled=true; }
+      });
+      updateApplyUI();
+    }
+    function timeTextForDisplay(total){ return formatTime(total); }
+    function randomTime(){
+      const step = (quizLevel.value==='easy')?5:1;
+      const m = Math.floor(Math.random()*60/step)*step;
+      const h = Math.floor(Math.random()*24);
+      return (h*60 + m) % 1440;
+    }
+    // AM/PM無視（角度で判定）
+    function sameAnalogTime(a,b){
+      const h1=Math.floor(a/60)%12, m1=a%60;
+      const h2=Math.floor(b/60)%12, m2=b%60;
+      return (h1===h2) && (m1===m2);
+    }
+    function startQuiz(){
+      state.quizActive=true; state.quizTarget=randomTime(); state.quizTotal++;
+      quizTotalSpan.textContent=state.quizTotal;
+      quizPrompt.textContent=`もんだい：${timeTextForDisplay(state.quizTarget)} に あわせよう`;
+      quizResult.textContent='';
+      setDigitalEnabled(false);
+      quizAnswer.disabled=false; quizNext.disabled=true;
+      if(quizSpeak.checked){
+        const t=state.quizTarget, h=Math.floor(t/60), m=t%60;
+        if(state.is12h){ const isPM=h>=12; let hh=h%12; if(hh===0) hh=12; speak(`もんだい。${isPM?'ごご':'ごぜん'} ${hh}じ ${m}ふん に あわせよう`); }
+        else{ speak(`もんだい。${h}じ ${m}ふん に あわせよう`); }
+      }
+    }
+    function answerQuiz(){
+      if(!state.quizActive) return;
+      const ok = sameAnalogTime(state.totalMin, state.quizTarget);
+      if(ok){
+        state.quizScore++;
+        quizResult.innerHTML=`<span class="ok badge">せいかい！</span>`;
+        playChime('ok');
+        if(quizSpeak.checked) speak('せいかい！すごい！');
+      }else{
+        const msg='ちがうよ';
+        quizResult.innerHTML=`<span class="ng badge">${msg}</span>`;
+        playChime('ng');
+        if(quizSpeak.checked) speak(msg);
+      }
+      quizScoreSpan.textContent=state.quizScore;
+      quizAnswer.disabled=true; quizNext.disabled=false;
+    }
+    function nextQuiz(){
+      setDigitalEnabled(true); state.quizActive=false;
+      quizPrompt.textContent='（つぎの もんだい を だしてね）'; quizResult.textContent='';
+      quizAnswer.disabled=true; quizNext.disabled=true;
+    }
+    quizStart.addEventListener('click', startQuiz);
+    quizAnswer.addEventListener('click', answerQuiz);
+    quizNext.addEventListener('click', nextQuiz);
+
+    // ===== 初期化 =====
+    function buildAll(){ buildWheels(); updateAnalog(); updateDigital(); }
+    buildAll();
+  </script>
+</body>
+</html>
