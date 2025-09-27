@@ -564,12 +564,42 @@
     dragHour.addEventListener('pointercancel', endDrag, {passive:false});
 
     // ===== 読み上げ =====
-    function chooseJaVoice(){ state.voices=speechSynthesis.getVoices(); state.voiceJa=state.voices.find(v=> (v.lang||'').toLowerCase().startsWith('ja'))||null; }
-    if('speechSynthesis' in window){ chooseJaVoice(); window.speechSynthesis.onvoiceschanged=chooseJaVoice; }
-    function speak(text){ if(!('speechSynthesis' in window)) return;
-      const u=new SpeechSynthesisUtterance(text); if(state.voiceJa) u.voice=state.voiceJa;
-      u.lang='ja-JP'; u.rate=1.0; u.pitch=1.0; try{ speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){}
+    function chooseJaVoice(){
+      state.voices = speechSynthesis.getVoices();
+    
+      // 「Kyoko」や「Female」といった名前を優先して探す
+      state.voiceJa = state.voices.find(v =>
+        (v.lang || '').toLowerCase().startsWith('ja') &&
+        /kyoko|female/i.test(v.name)
+      );
+    
+      // 見つからなければ日本語の最初の声
+      if(!state.voiceJa){
+        state.voiceJa = state.voices.find(v =>
+          (v.lang || '').toLowerCase().startsWith('ja')
+        ) || null;
+      }
     }
+    
+    // 初期化と声リスト変化に対応
+    if('speechSynthesis' in window){
+      chooseJaVoice();
+      window.speechSynthesis.onvoiceschanged = chooseJaVoice;
+    }
+    
+    function speak(text){
+      if(!('speechSynthesis' in window)) return;
+      const u = new SpeechSynthesisUtterance(text);
+      if(state.voiceJa) u.voice = state.voiceJa;
+      u.lang = 'ja-JP';
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      try{
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      }catch(e){}
+    }
+
     function speakTime(explicit=true){
       const t=state.totalMin;
       const h=Math.floor(t/60), m=t%60;
