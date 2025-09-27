@@ -8,10 +8,17 @@
     :root{
       --bg: #fff5f8; --bg-2:#ffe9f0; --ink:#6b4458;
       --accent:#ff7aa2; --accent-2:#ffb3c7; --ring:#ffc9d9;
-      --hand-hour:#c65c85;         /* 通常の短針 */
-      --hand-minute:#ff5e8a;       /* 通常の長針 */
-      --hand-hour-active:#a23b6c;  /* ドラッグ中の短針 */
-      --hand-minute-active:#ff2d73;/* ドラッグ中の長針 */
+      --hand-hour:#c65c85;           /* 通常の短針 */
+      --hand-minute:#ff5e8a;         /* 通常の長針 */
+      --hand-hour-active:#a23b6c;    /* ドラッグ中の短針 */
+      --hand-minute-active:#ff2d73;  /* ドラッグ中の長針 */
+
+      /* 操作帯（コントラスト強化） */
+      --zone-hour:#ffc2d4;           /* 短針帯＝ピンク */
+      --zone-hour-active:#ff97b8;    /* 短針帯アクティブ */
+      --zone-minute:#cfe4ff;         /* 長針帯＝みずいろ */
+      --zone-minute-active:#a9c9ff;  /* 長針帯アクティブ */
+
       --shadow: rgba(107,68,88,.2); --highlight: rgba(255,122,162,.14);
       --item-h: 56px; --wheel-w: 120px;
     }
@@ -35,20 +42,27 @@
     .clock-wrap{display:grid;place-items:center;padding:6px}
     svg{width:min(90vw,520px);max-width:560px;height:auto;touch-action:none}
     .face{fill:url(#gradFace)}
+    .zone{fill:none; stroke-linecap:round; pointer-events:none; transition:stroke .12s ease, stroke-width .12s ease, opacity .12s ease}
+    .zone-hour{ stroke: var(--zone-hour);   stroke-width:46; opacity:.75 }
+    .zone-minute{ stroke: var(--zone-minute); stroke-width:36; opacity:.75 }
+    .zone-hour.active{ stroke: var(--zone-hour-active); opacity:1 }
+    .zone-minute.active{ stroke: var(--zone-minute-active); opacity:1 }
+
     .tick{stroke:var(--ring);stroke-width:2}
     .tick.major{stroke-width:3}
+
     .hand-hour{stroke:var(--hand-hour);stroke-linecap:round;stroke-width:8;transition:stroke .12s ease, stroke-width .12s ease}
     .hand-minute{stroke:var(--hand-minute);stroke-linecap:round;stroke-width:6;transition:stroke .12s ease, stroke-width .12s ease}
     .hand-hour.active{stroke:var(--hand-hour-active);stroke-width:10}
     .hand-minute.active{stroke:var(--hand-minute-active);stroke-width:8}
+
     .pin{fill:var(--accent);stroke:#fff;stroke-width:2}
+
     .grab{fill:none;stroke:transparent;cursor:grab}
     .grab.active{cursor:grabbing}
     #dragHour{stroke-width:46}
     #dragMinute{stroke-width:36}
-    /* 掴んでいる間だけリングを淡く可視化 */
-    #dragHour.active{stroke:rgba(198,92,133,0.12)}
-    #dragMinute.active{stroke:rgba(255,94,138,0.12)}
+
     .num{fill:var(--ink);font-weight:800;font-size:22px;pointer-events:none;user-select:none}
 
     .hint{font-size:.95rem;color:#7a5a6c}
@@ -66,6 +80,8 @@
     .bigtime{font:900 2rem/1 ui-rounded,system-ui,-apple-system;color:var(--accent)}
     .smalltime{font-weight:800;color:#7a5a6c}
     .error{color:#b00020;font-size:.95rem}
+    .badge{display:inline-block;background:var(--bg-2);padding:4px 8px;border-radius:999px;font-weight:800}
+    .ok{color:#0a7a3c}.ng{color:#b00020}
 
     /* ボタン */
     .btn{border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#fff;font-weight:900;box-shadow:0 6px 18px -6px var(--shadow);cursor:pointer}
@@ -107,21 +123,29 @@
             <stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#ffe8ef"/>
           </radialGradient>
         </defs>
+
         <!-- 文字盤 -->
         <circle cx="150" cy="150" r="140" class="face" />
+
+        <!-- 操作帯（内側：短針／外側：長針） -->
+        <circle id="zoneHour"   class="zone zone-hour"   cx="150" cy="150" r="86"/>
+        <circle id="zoneMinute" class="zone zone-minute" cx="150" cy="150" r="120"/>
+
         <g id="ticks"></g>
         <g id="numbers"></g>
+
         <!-- 針 -->
         <line id="hourHand" x1="150" y1="150" x2="150" y2="96" class="hand-hour"/>
         <line id="minuteHand" x1="150" y1="150" x2="150" y2="58" class="hand-minute"/>
         <circle cx="150" cy="150" r="6" class="pin"/>
+
         <!-- 掴むレイヤ（内側＝短針／外側＝長針） -->
         <circle id="dragHour"   class="grab" cx="150" cy="150" r="86"/>
         <circle id="dragMinute" class="grab" cx="150" cy="150" r="120"/>
       </svg>
       <div class="hint">
-        ・<strong>がいがわ</strong>を つかむ → <strong>ながい はり</strong>（ふん）<br>
-        ・<strong>まんなかに ちかい ところ</strong>を つかむ → <strong>みじかい はり</strong>（じ）
+        ・<strong>ももいろ（内側）</strong>：<strong>みじかい はり</strong>（じ）／
+        <strong>みずいろ（外側）</strong>：<strong>ながい はり</strong>（ふん）
       </div>
     </section>
 
@@ -147,7 +171,6 @@
 
       <div class="row" id="errorRow" hidden><div class="error" id="errMsg"></div></div>
 
-      <!-- じっこうボタン（差分があるときだけ有効＆ピンク） -->
       <div class="row">
         <button class="btn" id="applyBtn" disabled>じっこう（あなろぐ に てきよう）</button>
       </div>
@@ -181,12 +204,15 @@
         </div>
       </div>
 
-      <!-- 読み上げ＆音 -->
+      <!-- 読み上げ＆音＆声選択 -->
       <div class="row">
         <button class="btn" id="speakBtn">▶︎ よみあげ</button>
         <label class="toggle"><input type="checkbox" id="autoSpeak"> じどう よみあげ</label>
         <label class="toggle"><input type="checkbox" id="fxSound" checked> おと を ならす</label>
-        <span class="hint">※ はじめは ぼたんで きょか が ひつよう（おと/こえ）</span>
+        <label class="toggle" id="voicePickerWrap" style="display:none">
+          <select id="voiceSelect" title="こえ を えらぶ"></select>
+        </label>
+        <span class="hint">※ はじめは ぼたんで きょか が ひつよう</span>
       </div>
     </section>
 
@@ -194,15 +220,17 @@
     <section class="card full" aria-label="もんだい もーど">
       <h2 class="title">もんだい もーど</h2>
       <div class="row">
-        <label class="toggle">むずかしさ：
+        <label class="toggle">れべる：
           <select id="quizLevel">
-            <option value="easy">やさしい（5ふんごと）</option>
-            <option value="normal" selected>ふつう（1ふん）</option>
+            <option value="easy">かんたん</option>
+            <option value="normal" selected>ふつう</option>
+            <option value="hard">ちゃれんじ</option>
           </select>
         </label>
         <button class="btn" id="quizStart">しゅつだい</button>
         <button class="btn" id="quizAnswer" disabled>こたえる</button>
         <button class="btn subtle" id="quizNext" disabled>つぎの もんだい</button>
+        <button class="btn subtle" id="quizEnd" disabled>もんだいを おわる</button>
         <label class="toggle"><input type="checkbox" id="quizSpeak"> もんだいを よみあげる</label>
       </div>
       <div class="row">
@@ -223,6 +251,10 @@
       const map={'０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9','：':':'};
       return map[ch]??ch;
     });
+
+    // 分/時インデックス（境界±0.5 tickのぶれ抑制）
+    function minuteIndexFromDeg(deg){ return Math.floor((deg + 3) / 6) % 60; }   // 6°/min
+    function hourIndexFromDeg(deg){   return Math.floor((deg + 15) / 30) % 12; } // 30°/hour
 
     // ===== state =====
     const state={
@@ -246,6 +278,8 @@
     const minuteHand=document.getElementById('minuteHand');
     const dragHour=document.getElementById('dragHour');
     const dragMinute=document.getElementById('dragMinute');
+    const zoneHour=document.getElementById('zoneHour');
+    const zoneMinute=document.getElementById('zoneMinute');
 
     const mode12=document.getElementById('mode12');
     const textTime=document.getElementById('textTime');
@@ -269,11 +303,14 @@
     const speakBtn=document.getElementById('speakBtn');
     const autoSpeak=document.getElementById('autoSpeak');
     const fxSound=document.getElementById('fxSound');
+    const voicePickerWrap=document.getElementById('voicePickerWrap');
+    const voiceSelect=document.getElementById('voiceSelect');
 
     const quizLevel=document.getElementById('quizLevel');
     const quizStart=document.getElementById('quizStart');
     const quizAnswer=document.getElementById('quizAnswer');
     const quizNext=document.getElementById('quizNext');
+    const quizEnd=document.getElementById('quizEnd');
     const quizPrompt=document.getElementById('quizPrompt');
     const quizResult=document.getElementById('quizResult');
     const quizScoreSpan=document.getElementById('quizScore');
@@ -295,8 +332,8 @@
       }
       // 数字（1..12）
       for(let i=1;i<=12;i++){
-        const a=i*30;                // 度
-        const r=112;                 // 半径（数字の位置）
+        const a=i*30;
+        const r=112;
         const x=150 + r*Math.sin(a*Math.PI/180);
         const y=150 - r*Math.cos(a*Math.PI/180);
         const t=document.createElementNS('http://www.w3.org/2000/svg','text');
@@ -309,7 +346,7 @@
       }
     })();
 
-    // ===== フォーマット =====
+    // ===== 表示フォーマット =====
     function formatTime(total){
       const h=Math.floor(total/60), m=total%60;
       if(state.is12h){
@@ -343,12 +380,12 @@
     }
     function readWheelIndex(w){ return Math.round(w.scrollTop/state.itemH); }
 
-    // ★ ホイール値の確定 → pendingMin 更新
+    // ホイール確定 → pendingMin 更新
     function commitWheelSelection(explicit = {}) {
       const mIdx = explicit.m ?? clamp(readWheelIndex(wheelMinute), 0, 59);
       if (state.is12h) {
-        const hIdx = explicit.h ?? clamp(readWheelIndex(wheelHour), 0, 11); // 0..11→1..12
-        const apIdx = explicit.ap ?? clamp(readWheelIndex(wheelAmPm), 0, 1); // 0:ごぜん/1:ごご
+        const hIdx = explicit.h ?? clamp(readWheelIndex(wheelHour), 0, 11);
+        const apIdx = explicit.ap ?? clamp(readWheelIndex(wheelAmPm), 0, 1);
         const h24  = ((hIdx + 1) % 12) + (apIdx === 1 ? 12 : 0);
         setPendingMin(h24 * 60 + mIdx);
       } else {
@@ -356,11 +393,9 @@
         setPendingMin(hIdx * 60 + mIdx);
       }
     }
-
     function attachWheel(w){
       if(!w || w.dataset.bound) return;
       let t=null;
-
       w.addEventListener('scroll', ()=>{
         if(state.suppressWheel) return;
         if(t) clearTimeout(t);
@@ -368,11 +403,9 @@
           const idx = readWheelIndex(w);
           wheelSelectIndex(w, idx);
           const exp = (w===wheelHour) ? {h:idx} : (w===wheelMinute) ? {m:idx} : {ap:idx};
-          setTimeout(()=> commitWheelSelection(exp), 260); // スナップ完了後に反映
+          setTimeout(()=> commitWheelSelection(exp), 260);
         }, 100);
       }, {passive:true});
-
-      // 指を離した瞬間にも確定（iPad対策）
       ['pointerup','touchend','mouseup'].forEach(ev=>{
         w.addEventListener(ev, ()=>{
           const idx=readWheelIndex(w);
@@ -381,8 +414,6 @@
           setTimeout(()=> commitWheelSelection(exp), 260);
         });
       });
-
-      // キーボード（デスクトップ）
       w.setAttribute('tabindex','0');
       w.addEventListener('keydown', e=>{
         if(e.key!=='ArrowUp'&&e.key!=='ArrowDown') return;
@@ -393,16 +424,13 @@
         const exp = (w===wheelHour)?{h:idx}:(w===wheelMinute)?{m:idx}:{ap:idx};
         setTimeout(()=> commitWheelSelection(exp), 260);
       });
-
       w.dataset.bound='1';
     }
-
     function attachTapSelect(w){
       if(!w || w.dataset.tap) return;
-
       const pick = (e)=>{
         const item = e.target.closest('.item'); if(!item) return;
-        e.preventDefault?.(); // iPadのコールアウト抑止
+        e.preventDefault?.();
         const items = Array.from(w.querySelectorAll('.item'));
         const idx = items.indexOf(item);
         if(idx<0) return;
@@ -410,12 +438,10 @@
         const exp = (w===wheelHour)?{h:idx}:(w===wheelMinute)?{m:idx}:{ap:idx};
         setTimeout(()=> commitWheelSelection(exp), 260);
       };
-
-      w.addEventListener('pointerdown', pick, {passive:false}); // タップ即反応
-      w.addEventListener('click', pick);                        // 互換
+      w.addEventListener('pointerdown', pick, {passive:false});
+      w.addEventListener('click', pick);
       w.dataset.tap='1';
     }
-
     function syncWheelsFromPending(){
       const h=Math.floor(state.pendingMin/60), m=state.pendingMin%60;
       if(state.is12h){
@@ -430,6 +456,12 @@
     }
 
     // ===== 表示・同期 =====
+    function formatTime12NoAmPm(total){
+      // 12時間表記（AM/PMを文言に含めない）
+      const h=Math.floor(total/60), m=total%60;
+      let hh=h%12; if(hh===0) hh=12;
+      return `${hh}:${pad2(m)}`;
+    }
     function updateAnalog(){
       const h=Math.floor(state.totalMin/60), m=state.totalMin%60;
       minuteHand.setAttribute('transform',`rotate(${m*6} 150 150)`);
@@ -442,15 +474,17 @@
       applyBtn.disabled = !dirty || state.quizActive;
     }
     function updateDigital(){
-      bigTime.textContent = formatTime(state.pendingMin);
-      if(document.activeElement!==textTime){ textTime.value = formatTime(state.pendingMin); }
+      // ドラッグ中は totalMin を直読（見かけの1分ズレ防止）
+      const display = (state.dragMode ? state.totalMin : state.pendingMin);
+      bigTime.textContent = formatTime(display);
+      if(document.activeElement!==textTime){ textTime.value = formatTime(display); }
+      // ホイールは pending を基準に維持
       syncWheelsFromPending();
       updateApplyUI();
     }
-
     function setTotalMin(newTotal, origin=null){
       state.totalMin=((newTotal%1440)+1440)%1440;
-      // アナログ操作・適用時は保留も揃える
+      // アナログ操作や適用時は pending も即時同期
       if(origin && (origin.startsWith('analog') || origin==='apply')){
         state.pendingMin = state.totalMin;
       }
@@ -463,7 +497,7 @@
       updateDigital();
     }
 
-    // ===== 入力 =====
+    // ===== テキスト入力 =====
     function parseTimeInput(str){
       let s = z2h(str).trim().toLowerCase();
       s = s.replace(/\s+/g,' ').replace(/：/g,':');
@@ -509,13 +543,13 @@
     mDown.addEventListener('click', ()=>{ setPendingMin(state.pendingMin-1); state.userInteracted=true; });
     apToggle.addEventListener('click', ()=>{ if(state.is12h){ setPendingMin(state.pendingMin + 12*60); state.userInteracted=true; }});
 
-    // ===== アナログ：ドラッグ =====
+    // ===== アナログ：ドラッグ（針＆帯のハイライト＋丸め補正）=====
     function pointToAngle(evt){
       const rect=clock.getBoundingClientRect();
       const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
       const x=(evt.clientX ?? (evt.touches&&evt.touches[0].clientX)) - cx;
       const y=(evt.clientY ?? (evt.touches&&evt.touches[0].clientY)) - cy;
-      let deg=Math.atan2(y,x)*180/Math.PI+90; if(deg<0) deg+=360;
+      let deg=Math.atan2(y,x)*180/Math.PI+90; if(deg<0) deg+=360; // 12時=0°
       return {deg};
     }
     function minuteDelta(prevIdx, newIdx){
@@ -524,10 +558,10 @@
     function startDrag(which){ return function(evt){
       state.dragMode=which; state.userInteracted=true;
       if(which==='minute'){
-        const {deg}=pointToAngle(evt); state.prevMinIndex=Math.round(deg/6)%60;
-        minuteHand.classList.add('active'); dragMinute.classList.add('active');
+        const {deg}=pointToAngle(evt); state.prevMinIndex=minuteIndexFromDeg(deg);
+        minuteHand.classList.add('active'); dragMinute.classList.add('active'); zoneMinute.classList.add('active');
       }else{
-        hourHand.classList.add('active'); dragHour.classList.add('active');
+        hourHand.classList.add('active'); dragHour.classList.add('active'); zoneHour.classList.add('active');
       }
       evt.target.setPointerCapture?.(evt.pointerId ?? 1); evt.preventDefault?.();
     };}
@@ -535,12 +569,12 @@
       if(!state.dragMode) return;
       const {deg}=pointToAngle(evt);
       if(state.dragMode==='minute'){
-        const idx=Math.round(deg/6)%60;
+        const idx=minuteIndexFromDeg(deg);
         if(state.prevMinIndex==null) state.prevMinIndex=idx;
         const delta=minuteDelta(state.prevMinIndex, idx);
         if(delta!==0){ setTotalMin(state.totalMin+delta,'analog-minute'); state.prevMinIndex=(state.prevMinIndex+delta+60)%60; }
       }else if(state.dragMode==='hour'){
-        const nearestHour = Math.round(deg/30)%12;
+        const nearestHour = hourIndexFromDeg(deg);
         const cur=(Math.floor(state.totalMin/60))%12;
         let d=nearestHour-cur; if(d>6)d-=12; if(d<-6)d+=12;
         if(d!==0) setTotalMin(state.totalMin + d*60, 'analog-hour');
@@ -549,9 +583,8 @@
     }
     function endDrag(evt){
       state.dragMode=null; state.prevMinIndex=null;
-      // ハイライト解除
-      minuteHand.classList.remove('active'); dragMinute.classList.remove('active');
-      hourHand.classList.remove('active');   dragHour.classList.remove('active');
+      minuteHand.classList.remove('active'); dragMinute.classList.remove('active'); zoneMinute.classList.remove('active');
+      hourHand.classList.remove('active');   dragHour.classList.remove('active');   zoneHour.classList.remove('active');
       evt.target.releasePointerCapture?.(evt.pointerId ?? 1); evt.preventDefault?.();
     }
     dragMinute.addEventListener('pointerdown', startDrag('minute'), {passive:false});
@@ -563,88 +596,92 @@
     dragHour.addEventListener('pointerup', endDrag, {passive:false});
     dragHour.addEventListener('pointercancel', endDrag, {passive:false});
 
-    // ===== 読み上げ =====
-    function chooseJaVoice(){
-      state.voices = speechSynthesis.getVoices();
-    
-      // 「Kyoko」や「Female」といった名前を優先して探す
-      state.voiceJa = state.voices.find(v =>
-        (v.lang || '').toLowerCase().startsWith('ja') &&
-        /kyoko|female/i.test(v.name)
-      );
-    
-      // 見つからなければ日本語の最初の声
-      if(!state.voiceJa){
-        state.voiceJa = state.voices.find(v =>
-          (v.lang || '').toLowerCase().startsWith('ja')
-        ) || null;
-      }
+    // ===== 読み上げ（声選択UIつき）=====
+    const PREFERRED_JA_FEMALE=[/kyoko/i,/female/i,/ja.*(female|woman)/i,/siri.*(voice\\s*2|female)/i];
+    function waitForVoices(maxWaitMs=3000){
+      return new Promise(resolve=>{
+        const t0=performance.now();
+        const tick=()=>{
+          const v=speechSynthesis.getVoices();
+          if(v&&v.length) return resolve(v);
+          if(performance.now()-t0>maxWaitMs) return resolve(v||[]);
+          setTimeout(tick,100);
+        };
+        speechSynthesis.onvoiceschanged=()=>resolve(speechSynthesis.getVoices()||[]);
+        tick();
+      });
     }
-    
-    // 初期化と声リスト変化に対応
-    if('speechSynthesis' in window){
-      chooseJaVoice();
-      window.speechSynthesis.onvoiceschanged = chooseJaVoice;
+    function pickJaVoice(voices){
+      const ja = voices.filter(v => (v.lang||'').toLowerCase().startsWith('ja'));
+      const byName = rx => ja.find(v => rx.test(v.name||'')) || null;
+      for(const rx of PREFERRED_JA_FEMALE){ const hit=byName(rx); if(hit) return hit; }
+      return ja[0] || null;
     }
-    
+    async function setupVoicesUI(){
+      if(!('speechSynthesis' in window)) return;
+      const voices=await waitForVoices(); state.voices=voices;
+      if(!voices.length){ voicePickerWrap.style.display='none'; return; }
+      voiceSelect.innerHTML='';
+      const gJa=document.createElement('optgroup'); gJa.label='にほんご';
+      const gAll=document.createElement('optgroup'); gAll.label='そのほか';
+      voices.forEach(v=>{
+        const o=document.createElement('option');
+        o.value=v.voiceURI||v.name; o.textContent=`${v.name} (${v.lang})`; o.dataset.lang=v.lang||'';
+        ((v.lang||'').toLowerCase().startsWith('ja')?gJa:gAll).appendChild(o);
+      });
+      if(gJa.children.length) voiceSelect.appendChild(gJa);
+      if(gAll.children.length) voiceSelect.appendChild(gAll);
+      const saved=localStorage.getItem('voiceURI');
+      let voice=(saved && voices.find(v=>(v.voiceURI||v.name)===saved)) || pickJaVoice(voices) || voices[0];
+      state.voiceJa=voice; voiceSelect.value=voice.voiceURI||voice.name; voicePickerWrap.style.display='inline-flex';
+      voiceSelect.addEventListener('change',()=>{
+        const key=voiceSelect.value; const v=voices.find(v=>(v.voiceURI||v.name)===key);
+        if(v){ state.voiceJa=v; localStorage.setItem('voiceURI',key); }
+      });
+    }
+    if('speechSynthesis' in window){ setupVoicesUI(); }
+
     function speak(text){
       if(!('speechSynthesis' in window)) return;
-      const u = new SpeechSynthesisUtterance(text);
-      if(state.voiceJa) u.voice = state.voiceJa;
-      u.lang = 'ja-JP';
-      u.rate = 1.0;
-      u.pitch = 1.0;
-      try{
-        speechSynthesis.cancel();
-        speechSynthesis.speak(u);
-      }catch(e){}
+      const u=new SpeechSynthesisUtterance(text);
+      if(state.voiceJa) u.voice=state.voiceJa;
+      u.lang='ja-JP'; u.rate=1.0; u.pitch=1.0;
+      try{ speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){}
     }
+    speakBtn.addEventListener('click', ()=>{ speakTime(true); });
+    autoSpeak.addEventListener('change', ()=>{ state.autoSpeak=autoSpeak.checked; state.userInteracted=true; });
 
     function speakTime(explicit=true){
-      const t=state.totalMin;
-      const h=Math.floor(t/60), m=t%60;
+      const t=state.totalMin, h=Math.floor(t/60), m=t%60;
       if(state.is12h){ const isPM=h>=12; let hh=h%12; if(hh===0) hh=12; speak(`${isPM?'ごご':'ごぜん'} ${hh}じ ${m}ふん`); }
       else{ speak(`${h}じ ${m}ふん`); }
       if(explicit) state.userInteracted=true;
     }
-    speakBtn.addEventListener('click', ()=>speakTime(true));
-    autoSpeak.addEventListener('change', ()=>{ state.autoSpeak=autoSpeak.checked; state.userInteracted=true; });
 
     // ===== 効果音（ピンポーン／ブブー） =====
     let audioCtx=null;
     function ensureAudio(){
       if(!audioCtx){
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if(AC) audioCtx = new AC();
+        const AC=window.AudioContext||window.webkitAudioContext;
+        if(AC) audioCtx=new AC();
       }
-      if(audioCtx && audioCtx.state === 'suspended'){ audioCtx.resume(); }
+      if(audioCtx&&audioCtx.state==='suspended'){ audioCtx.resume(); }
     }
-    function tone(freq, start, dur, type='sine', vol=0.22){
+    function tone(freq,start,dur,type='sine',vol=0.22){
       if(!audioCtx) return;
-      const ctx=audioCtx;
-      const o=ctx.createOscillator();
-      const g=ctx.createGain();
-      o.type=type; o.frequency.setValueAtTime(freq, ctx.currentTime + start);
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + start);
-      g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + start + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+      const ctx=audioCtx, o=ctx.createOscillator(), g=ctx.createGain();
+      o.type=type; o.frequency.setValueAtTime(freq, ctx.currentTime+start);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime+start);
+      g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime+start+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+start+dur);
       o.connect(g).connect(ctx.destination);
-      o.start(ctx.currentTime + start);
-      o.stop(ctx.currentTime + start + dur + 0.05);
+      o.start(ctx.currentTime+start); o.stop(ctx.currentTime+start+dur+0.05);
     }
     function playChime(kind){
-      if(!fxSound.checked) return;
-      ensureAudio();
-      if(!audioCtx) return;
-      if(kind==='ok'){
-        tone(880,     0.00, 0.12, 'sine', 0.25);
-        tone(1174.66, 0.14, 0.14, 'sine', 0.22);
-      }else{
-        tone(196, 0.00, 0.25, 'sawtooth', 0.15);
-        tone(185, 0.00, 0.25, 'sawtooth', 0.12);
-        tone(196, 0.28, 0.25, 'sawtooth', 0.15);
-        tone(185, 0.28, 0.25, 'sawtooth', 0.12);
-      }
+      if(!fxSound.checked) return; ensureAudio(); if(!audioCtx) return;
+      if(kind==='ok'){ tone(880,0.00,0.12,'sine',0.25); tone(1174.66,0.14,0.14,'sine',0.22); }
+      else{ tone(196,0.00,0.25,'sawtooth',0.15); tone(185,0.00,0.25,'sawtooth',0.12);
+            tone(196,0.28,0.25,'sawtooth',0.15); tone(185,0.28,0.25,'sawtooth',0.12); }
     }
 
     // ===== じっこう =====
@@ -655,28 +692,36 @@
     }
     applyBtn.addEventListener('click', applyPending);
 
-    // ===== クイズ =====
+    // ===== クイズ（モード仕様）=====
     function setDigitalEnabled(enabled){
-      const on = !!enabled;
-      [wheelsBox, textTime, hUp, hDown, mUp, mDown, apToggle, applyBtn].forEach(el=>{
-        if(!el) return;
-        if(on){ el.classList.remove('disabled'); el.disabled=false; }
-        else{ el.classList.add?.('disabled'); el.disabled=true; }
+      const on=!!enabled;
+      [wheelsBox,textTime,hUp,hDown,mUp,mDown,apToggle,applyBtn].forEach(el=>{
+        if(!el) return; if(on){ el.classList.remove('disabled'); el.disabled=false; } else { el.classList.add?.('disabled'); el.disabled=true; }
       });
       updateApplyUI();
     }
-    function timeTextForDisplay(total){ return formatTime(total); }
     function randomTime(){
-      const step = (quizLevel.value==='easy')?5:1;
+      const step = (quizLevel.value==='easy') ? 5 : 1;   // かんたん＝5分、他＝1分
       const m = Math.floor(Math.random()*60/step)*step;
       const h = Math.floor(Math.random()*24);
       return (h*60 + m) % 1440;
     }
-    // AM/PM無視（角度で判定）
-    function sameAnalogTime(a,b){
-      const h1=Math.floor(a/60)%12, m1=a%60;
-      const h2=Math.floor(b/60)%12, m2=b%60;
-      return (h1===h2) && (m1===m2);
+    function timeTextForDisplay(total){
+      const h=Math.floor(total/60), m=total%60;
+      if(quizLevel.value==='hard'){ 
+        // ちゃれんじ：24時間
+        return `${pad2(h)}:${pad2(m)}`;
+      } else {
+        // かんたん／ふつう：12時間（AM/PMは書かない）
+        let hh=h%12; if(hh===0) hh=12;
+        return `${hh}:${pad2(m)}`;
+      }
+    }
+    function sameAnalogTime(answer, target){
+      const h1=Math.floor(answer/60), m1=answer%60;
+      const h2=Math.floor(target/60), m2=target%60;
+      if(quizLevel.value==='hard'){ return (h1===h2)&&(m1===m2); }        // 24h 完全一致
+      return (h1%12===h2%12)&&(m1===m2);                                  // 12h AM/PM無視
     }
     function startQuiz(){
       state.quizActive=true; state.quizTarget=randomTime(); state.quizTotal++;
@@ -684,41 +729,56 @@
       quizPrompt.textContent=`もんだい：${timeTextForDisplay(state.quizTarget)} に あわせよう`;
       quizResult.textContent='';
       setDigitalEnabled(false);
-      quizAnswer.disabled=false; quizNext.disabled=true;
+      quizAnswer.disabled=false; quizNext.disabled=false; quizEnd.disabled=false;
       if(quizSpeak.checked){
         const t=state.quizTarget, h=Math.floor(t/60), m=t%60;
-        if(state.is12h){ const isPM=h>=12; let hh=h%12; if(hh===0) hh=12; speak(`もんだい。${isPM?'ごご':'ごぜん'} ${hh}じ ${m}ふん に あわせよう`); }
-        else{ speak(`もんだい。${h}じ ${m}ふん に あわせよう`); }
+        if(quizLevel.value==='hard'){ speak(`もんだい。${h}じ ${m}ふん に あわせよう`); }
+        else { let hh=h%12; if(hh===0) hh=12; speak(`もんだい。${hh}じ ${m}ふん に あわせよう`); } // AM/PMを言わない
       }
     }
     function answerQuiz(){
       if(!state.quizActive) return;
       const ok = sameAnalogTime(state.totalMin, state.quizTarget);
-      if(ok){
-        state.quizScore++;
-        quizResult.innerHTML=`<span class="ok badge">せいかい！</span>`;
-        playChime('ok');
-        if(quizSpeak.checked) speak('せいかい！すごい！');
-      }else{
-        const msg='ちがうよ';
-        quizResult.innerHTML=`<span class="ng badge">${msg}</span>`;
-        playChime('ng');
-        if(quizSpeak.checked) speak(msg);
-      }
+      if(ok){ state.quizScore++; quizResult.innerHTML=`<span class="ok badge">せいかい！</span>`; playChime('ok'); if(quizSpeak.checked) speak('せいかい！すごい！'); }
+      else { quizResult.innerHTML=`<span class="ng badge">ちがうよ</span>`; playChime('ng'); if(quizSpeak.checked) speak('ちがうよ'); }
       quizScoreSpan.textContent=state.quizScore;
-      quizAnswer.disabled=true; quizNext.disabled=false;
     }
     function nextQuiz(){
-      setDigitalEnabled(true); state.quizActive=false;
-      quizPrompt.textContent='（つぎの もんだい を だしてね）'; quizResult.textContent='';
-      quizAnswer.disabled=true; quizNext.disabled=true;
+      if(!state.quizActive) return;
+      // 次の問題を上書き
+      state.quizTarget=randomTime(); state.quizTotal++;
+      quizTotalSpan.textContent=state.quizTotal;
+      quizPrompt.textContent=`もんだい：${timeTextForDisplay(state.quizTarget)} に あわせよう`;
+      quizResult.textContent='';
+      if(quizSpeak.checked){
+        const t=state.quizTarget, h=Math.floor(t/60), m=t%60;
+        if(quizLevel.value==='hard'){ speak(`もんだい。${h}じ ${m}ふん に あわせよう`); }
+        else { let hh=h%12; if(hh===0) hh=12; speak(`もんだい。${hh}じ ${m}ふん に あわせよう`); }
+      }
+    }
+    function endQuiz(){
+      // 成績発表
+      const total = Math.max(1, state.quizTotal); // 0割回避
+      const rate = Math.round((state.quizScore / total) * 100);
+      quizResult.innerHTML = `<span class="badge">せいせき：${state.quizScore} / ${state.quizTotal}（${rate}%）</span>`;
+      // モード解除＆操作復帰
+      setDigitalEnabled(true);
+      state.quizActive=false;
+      quizPrompt.textContent='（もんだいは おわりました）';
+      quizAnswer.disabled=true; quizNext.disabled=true; quizEnd.disabled=true;
     }
     quizStart.addEventListener('click', startQuiz);
     quizAnswer.addEventListener('click', answerQuiz);
     quizNext.addEventListener('click', nextQuiz);
+    quizEnd.addEventListener('click', endQuiz);
 
     // ===== 初期化 =====
-    function buildAll(){ buildWheels(); updateAnalog(); updateDigital(); }
+    function buildAll(){ 
+      buildWheels(); 
+      updateAnalog(); 
+      updateDigital(); 
+      setDigitalEnabled(true);   // 起動時はデジタル操作ON
+    }
     buildAll();
   </script>
 </body>
